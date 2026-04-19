@@ -122,8 +122,17 @@ export interface CoachContext {
   weeklySummary?: string;
 }
 
+export interface WeeklySummaryContext {
+  profile: PersonProfile;
+  activeGoals: GoalRecord[];
+  recentEntries: JournalEntry[];
+  signals: BehaviorSignals;
+  baseSummary: string;
+}
+
 export interface Coach {
   reply(context: CoachContext): Promise<string>;
+  summarizeWeekly(context: WeeklySummaryContext): Promise<string>;
 }
 
 export interface MemoryStore {

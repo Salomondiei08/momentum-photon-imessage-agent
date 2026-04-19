@@ -2,7 +2,7 @@
 
 > An iMessage-native accountability agent that remembers your commitments, checks in automatically, and pushes you toward the next concrete move.
 
-Momentum is a more serious Photon prototype now. It onboards users by text, stores durable memory in SQLite, schedules morning and evening routines, tracks streaks and unfinished promises, and uses OpenAI when available without depending on it to remain useful.
+Momentum is a serious Photon prototype for personal accountability over iMessage. It onboards users by text, stores durable memory in SQLite, tracks goals and unfinished promises, runs scheduled morning and evening routines, generates weekly recaps, and can be inspected locally through an admin CLI.
 
 ## One-Line Pitch
 
@@ -13,11 +13,12 @@ Momentum is a more serious Photon prototype now. It onboards users by text, stor
 | Layer | Choice | Why |
 | --- | --- | --- |
 | Messaging | `@photon-ai/imessage-kit` | Native iMessage send/read/watch flow on macOS |
-| Runtime | Node.js + TypeScript | Strict local development and simple deployment story |
-| Persistence | `better-sqlite3` | Durable local storage for profiles, goals, journal history, scheduler state, and dedupe records |
-| AI | OpenAI Responses API | Sharper, memory-aware coaching with retry and fallback |
+| Runtime | Node.js + TypeScript | Strict local development with a simple operational setup |
+| Persistence | `better-sqlite3` | Durable storage for profiles, goals, journal history, scheduler state, and dedupe records |
+| AI | OpenAI Responses API | Sharper coaching replies and cleaner weekly summaries |
 | Scheduling | Photon `MessageScheduler` | Daily check-ins, evening reflections, and Sunday recap prompts |
-| Testing | Jest + `ts-jest` | Fast verification of onboarding, parsing, duplicate protection, and persistence |
+| Ops | Structured JSON logs + admin CLI | Easier debugging and local state inspection |
+| Testing | Jest + `ts-jest` | Fast verification of onboarding, dedupe, summaries, and persistence |
 
 ## Product Card
 
@@ -35,15 +36,17 @@ Momentum is a more serious Photon prototype now. It onboards users by text, stor
 ## What Makes It Serious
 
 - Text-based onboarding flow for first-time users
-- SQLite-backed persistence instead of a JSON prototype file
+- SQLite-backed persistence instead of a prototype JSON file
 - Duplicate-message protection using stored iMessage GUIDs
-- Daily morning check-ins, evening reflections, and Sunday weekly recap prompts
+- Daily morning check-ins, evening reflections, and Sunday recap prompts
 - Streak tracking and best-streak tracking
 - Last-promise tracking so unfinished commitments stay visible
-- Procrastination-pattern detection from recent behavior
-- OpenAI retry logic with deterministic fallback if the model call fails
+- Stronger follow-up behavior when a promise is still open
+- LLM-generated weekly recap output with deterministic fallback
+- OpenAI retry logic with fallback coaching if the model call fails
 - Structured JSON logging for runtime events
-- `--dry-run` and `--healthcheck` modes for safer verification
+- `--dry-run` and `--healthcheck` support
+- Local admin CLI for inspecting users and recent memory
 - Prompt version tracking so behavior changes are explicit
 
 ## Conversation Flow
@@ -67,11 +70,14 @@ Momentum: You’re set. Today’s priority is finish the hero case study. I’ll
 ### Ongoing Use
 
 ```text
-You: stuck avoiding outreach
-Momentum: Quick truth: you have been circling this without a win. Send one ugly outreach message in the next 15 minutes, then text me "done sent one".
+You: promise send two outreach messages
+Momentum: Promise logged: send two outreach messages. I’ll follow up on it.
 
-You: done sent one
-Momentum: Count that as real progress. Keep the streak alive by naming the next action before the day ends.
+You: good morning
+Momentum: Quick truth: before you add something new, close the loop on your promise to send two outreach messages. What is the smallest version of that you can finish today?
+
+You: recap
+Momentum: This week you moved the portfolio case study forward, but outreach kept slipping. Best next focus: finish one outreach block early this week before adding new tasks.
 ```
 
 ## Commands
@@ -91,20 +97,40 @@ Momentum: Count that as real progress. Keep the streak alive by naming the next 
 
 Anything else is treated as conversation and passed through the coaching layer with memory and behavior signals attached.
 
+## Operational Features
+
+### Runtime modes
+
+- `npm start` for the live iMessage watcher
+- `npm run dry-run` to process messages without sending replies
+- `npm run healthcheck` to validate config and local readiness
+
+### Admin CLI
+
+Inspect the SQLite-backed local state after building:
+
+```bash
+npm run admin -- users
+npm run admin -- profile +15555550123
+npm run admin -- recent +15555550123
+```
+
 ## Architecture
 
 ```text
 src/
   index.ts                 Runtime entrypoint + dry-run/healthcheck support
-  momentum-agent.ts        Onboarding, command routing, streaks, routines, duplicate protection
-  coach.ts                 OpenAI-backed coach with retry + fallback coach
+  admin.ts                 Local admin CLI for user/profile/journal inspection
+  momentum-agent.ts        Onboarding, command routing, streaks, routines, dedupe
+  coach.ts                 OpenAI-backed coach + fallback coach + weekly summaries
   logger.ts                Structured JSON logger
   parser.ts                Text command parsing helpers
   store/sqlite-store.ts    SQLite persistence for profiles, goals, journal, meta, processed GUIDs
 __tests__/
-  momentum-agent.test.ts   Onboarding, dedupe, weekly recap
-  parser.test.ts           Command/time parsing
-  sqlite-store.test.ts     Restart-safe persistence
+  coach.test.ts
+  momentum-agent.test.ts
+  parser.test.ts
+  sqlite-store.test.ts
 ```
 
 ## Setup
@@ -130,10 +156,10 @@ OPENAI_API_KEY=your_rotated_key_here
 OPENAI_MODEL=gpt-4.1-mini
 AGENT_NAME=Momentum
 MOMENTUM_DB_FILE=./data/momentum.sqlite
-PROMPT_VERSION=2026-04-19-serious-v1
+PROMPT_VERSION=2026-04-19-serious-v2
 ```
 
-## Run Modes
+## Run
 
 Build first:
 

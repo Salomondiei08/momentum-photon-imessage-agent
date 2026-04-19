@@ -11,7 +11,8 @@
     "dev": "node --loader ts-node/esm src/index.ts",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand",
     "healthcheck": "node dist/index.js --healthcheck",
-    "dry-run": "node dist/index.js --dry-run"
+    "dry-run": "node dist/index.js --dry-run",
+    "admin": "node dist/admin.js"
   },
   "keywords": [
     "photon",

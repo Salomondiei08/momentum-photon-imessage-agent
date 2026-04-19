@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 
 import { Logger } from './logger.js';
-import type { BehaviorSignals, Coach, CoachContext } from './types.js';
+import type { BehaviorSignals, Coach, CoachContext, WeeklySummaryContext } from './types.js';
 
 function buildSystemPrompt(context: CoachContext): string {
   return [
@@ -52,6 +52,10 @@ export class FallbackCoach implements Coach {
       return `${styleLead} count that as real progress. Keep the streak alive by naming the next action for ${goal} before the day ends.`;
     }
 
+    if ((context.intent === 'check-in' || context.intent === 'general') && promise) {
+      return `${styleLead} before you add something new, close the loop on your promise to ${promise}. What is the smallest version of that you can finish today?`;
+    }
+
     if (context.profile.mode === 'planner' || context.intent === 'planning') {
       return `${styleLead} turn this into one concrete move for today. Time-box 25 minutes, finish the ugliest useful version, and report back with "done ..." when it ships.`;
     }
@@ -61,6 +65,21 @@ export class FallbackCoach implements Coach {
     }
 
     return `${styleLead} the next useful move for ${goal} is to pick one concrete task and commit to it in a single sentence.`;
+  }
+
+  public async summarizeWeekly(context: WeeklySummaryContext): Promise<string> {
+    const goal = context.activeGoals[0]?.text ?? 'your goal';
+    const unfinished = context.signals.unfinishedPromise
+      ? `Unfinished promise: ${context.signals.unfinishedPromise}.`
+      : 'No unfinished promise is currently tracked.';
+
+    return [
+      `Weekly recap for ${goal}:`,
+      context.baseSummary,
+      unfinished,
+      `Recent wins logged: ${context.signals.recentWins}.`,
+      'Best next focus: choose one commitment you can finish early this week.'
+    ].join('\n');
   }
 }
 
@@ -153,6 +172,76 @@ export class OpenAICoach implements Coach {
       sender: context.profile.sender
     });
     return this.fallback.reply(context);
+  }
+
+  public async summarizeWeekly(context: WeeklySummaryContext): Promise<string> {
+    const memory = JSON.stringify(
+      {
+        profile: {
+          sender: context.profile.sender,
+          displayName: context.profile.displayName,
+          streakCount: context.profile.streakCount,
+          bestStreak: context.profile.bestStreak,
+          lastPromise: context.profile.lastPromise,
+          accountabilityStyle: context.profile.accountabilityStyle
+        },
+        activeGoals: context.activeGoals.map((goal) => goal.text),
+        recentEntries: context.recentEntries.map((entry) => ({
+          kind: entry.kind,
+          text: entry.text,
+          createdAt: entry.createdAt
+        })),
+        signals: summarizeSignals(context.signals),
+        baseSummary: context.baseSummary
+      },
+      null,
+      2
+    );
+
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        const response = await this.client.responses.create({
+          model: this.model,
+          input: [
+            {
+              role: 'system',
+              content: [
+                {
+                  type: 'input_text',
+                  text:
+                    'You write concise weekly accountability recaps for an iMessage-native coach. Plain text only. Be crisp, honest, and motivating. Include what moved, what stalled, and the single best next focus.'
+                }
+              ]
+            },
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'input_text',
+                  text: memory
+                }
+              ]
+            }
+          ]
+        });
+
+        return response.output_text.trim();
+      } catch (error) {
+        this.logger.warn('openai_weekly_retry', {
+          attempt,
+          model: this.model,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+
+        if (attempt === 3) {
+          break;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, attempt * 300));
+      }
+    }
+
+    return this.fallback.summarizeWeekly(context);
   }
 }
 

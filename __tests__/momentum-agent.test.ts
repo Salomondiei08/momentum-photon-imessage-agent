@@ -47,7 +47,10 @@ function createMessage(text: string, guid = 'g1') {
 }
 
 function createAgent(store: MemoryStore, coachReply = 'coach reply') {
-  const coach: Coach = { reply: jest.fn().mockResolvedValue(coachReply) };
+  const coach: Coach = {
+    reply: jest.fn().mockResolvedValue(coachReply),
+    summarizeWeekly: jest.fn().mockResolvedValue(`Weekly recap\n${coachReply}`)
+  };
   const scheduler = {
     scheduleRecurring: jest.fn().mockReturnValue('sched_1'),
     cancel: jest.fn(),
@@ -155,7 +158,7 @@ describe('MomentumAgent', () => {
     const { agent } = createAgent(store);
 
     const reply = await agent.handleMessage(createMessage('recap', 'g5'));
-    expect(reply).toContain('Weekly recap for ship the demo');
-    expect(reply).toContain('Current streak: 3 day(s)');
+    expect(reply).toContain('Weekly recap');
+    expect(reply).toContain('coach reply');
   });
 });

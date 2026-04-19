@@ -86,7 +86,7 @@ export class MomentumAgent {
           reply = await this.handleStyle(state, profile, command.style);
           break;
         case 'recap':
-          reply = this.buildWeeklySummary(state, profile);
+          reply = await this.handleRecap(state, profile);
           break;
         case 'reflect':
           reply = await this.handleReflection(state, profile, command.value);
@@ -311,6 +311,18 @@ export class MomentumAgent {
     profile.lastReflectionAt = nowIso();
     this.pushEntry(state, profile.sender, 'reflection', text);
     return this.handleCoach(state, profile, text, 'reflection', 'reflection');
+  }
+
+  private async handleRecap(state: AgentState, profile: PersonProfile): Promise<string> {
+    const summary = await this.services.coach.summarizeWeekly({
+      profile,
+      activeGoals: this.activeGoals(state, profile),
+      recentEntries: this.recentEntries(state, profile),
+      signals: this.computeSignals(state, profile),
+      baseSummary: this.buildWeeklySummary(state, profile)
+    });
+    this.pushEntry(state, profile.sender, 'weekly-recap', summary);
+    return summary;
   }
 
   private async handleCoach(
