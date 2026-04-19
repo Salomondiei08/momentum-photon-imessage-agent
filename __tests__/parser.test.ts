@@ -1,7 +1,7 @@
-import { nextOccurrence, parseCommand, parseDailyTime } from '../src/parser';
+import { nextOccurrence, parseCommand, parseDailyTime, parseMode, parseStyle } from '../src/parser';
 
 describe('parseCommand', () => {
-  test('parses explicit commands', () => {
+  test('parses richer explicit commands', () => {
     expect(parseCommand('goal write the launch email')).toEqual({
       type: 'goal',
       value: 'write the launch email'
@@ -10,6 +10,16 @@ describe('parseCommand', () => {
     expect(parseCommand('nudge 8am')).toEqual({
       type: 'nudge',
       time: '8am'
+    });
+
+    expect(parseCommand('mode planner')).toEqual({
+      type: 'mode',
+      mode: 'planner'
+    });
+
+    expect(parseCommand('style strict')).toEqual({
+      type: 'style',
+      style: 'strict'
     });
   });
 
@@ -21,8 +31,13 @@ describe('parseCommand', () => {
   });
 });
 
-describe('parseDailyTime', () => {
-  test('handles 12-hour formats', () => {
+describe('parse helpers', () => {
+  test('parses mode and style values', () => {
+    expect(parseMode('planner')).toBe('planner');
+    expect(parseStyle('gentle please')).toBe('gentle');
+  });
+
+  test('handles 12-hour time formats', () => {
     expect(parseDailyTime('8am')).toEqual({
       hour: 8,
       minute: 0,

@@ -1,87 +1,110 @@
 # Momentum
 
-> The accountability coach you text like a friend when you need to follow through.
+> An iMessage-native accountability agent that remembers your commitments, checks in automatically, and pushes you toward the next concrete move.
 
-Momentum is an iMessage-native agent built with Photon. You text it a goal, today’s priority, or where you are stuck, and it replies with context-aware coaching that remembers what you said last time.
+Momentum is a more serious Photon prototype now. It onboards users by text, stores durable memory in SQLite, schedules morning and evening routines, tracks streaks and unfinished promises, and uses OpenAI when available without depending on it to remain useful.
 
-## Why this works
+## One-Line Pitch
 
-- Personal utility: this is something you can actually text tomorrow morning.
-- Conversation-native: no web app, no dashboard, no extra UI, just Messages.
-- Explainable in one sentence: "It is an accountability coach that keeps the thread going over text."
+`Momentum is the accountability coach you can text like a friend, and it actually remembers what you promised.`
 
 ## Stack
 
 | Layer | Choice | Why |
 | --- | --- | --- |
-| Messaging | `@photon-ai/imessage-kit` | Native iMessage read/send/watch flow on macOS |
-| Runtime | Node.js + TypeScript | Fast local iteration with strict typing |
-| Memory | Local JSON store | Lightweight persistence for goals, check-ins, and nudges |
-| Coaching | OpenAI Responses API | More human, contextual replies when `OPENAI_API_KEY` is set |
-| Fallback | Deterministic coach logic | Useful even without a model key |
-| Testing | Jest + `ts-jest` | Focused coverage for parser and agent behavior |
+| Messaging | `@photon-ai/imessage-kit` | Native iMessage send/read/watch flow on macOS |
+| Runtime | Node.js + TypeScript | Strict local development and simple deployment story |
+| Persistence | `better-sqlite3` | Durable local storage for profiles, goals, journal history, scheduler state, and dedupe records |
+| AI | OpenAI Responses API | Sharper, memory-aware coaching with retry and fallback |
+| Scheduling | Photon `MessageScheduler` | Daily check-ins, evening reflections, and Sunday recap prompts |
+| Testing | Jest + `ts-jest` | Fast verification of onboarding, parsing, duplicate protection, and persistence |
 
-## Agent Card
+## Product Card
 
 | Field | Value |
 | --- | --- |
 | Name | `Momentum` |
 | Category | Personal utility |
 | Interface | iMessage only |
-| Core job | Keep someone accountable to one active goal |
-| Best use | Morning check-ins, daily priority setting, stuck moments |
-| Memory | Goal, recent check-ins, wins, daily nudge time |
-| One-line pitch | "Text Momentum your goal and it keeps nudging you forward." |
+| Best user | Someone trying to follow through on one important goal |
+| Core promise | Turn vague intention into recurring accountability over text |
+| Modes | `coach`, `planner`, `review` |
+| Styles | `gentle`, `strict`, `tactical` |
+| Durable memory | Goals, priorities, promises, reflections, streaks, scheduler state, processed message IDs |
 
-## What it can do
+## What Makes It Serious
 
-- Track a user’s current goal
-- Remember today’s priority
-- Respond to wins and stuck moments with coaching
-- Send a recurring daily nudge like `nudge 8am`
-- Keep context from previous messages so the conversation feels continuous
-- Run without OpenAI, then upgrade gracefully when a key is added
+- Text-based onboarding flow for first-time users
+- SQLite-backed persistence instead of a JSON prototype file
+- Duplicate-message protection using stored iMessage GUIDs
+- Daily morning check-ins, evening reflections, and Sunday weekly recap prompts
+- Streak tracking and best-streak tracking
+- Last-promise tracking so unfinished commitments stay visible
+- Procrastination-pattern detection from recent behavior
+- OpenAI retry logic with deterministic fallback if the model call fails
+- Structured JSON logging for runtime events
+- `--dry-run` and `--healthcheck` modes for safer verification
+- Prompt version tracking so behavior changes are explicit
 
-## Sample Conversation
+## Conversation Flow
+
+### Onboarding
 
 ```text
-You: goal ship my portfolio refresh
-Momentum: Locked in: ship my portfolio refresh. I’ll treat that as your main goal until you change it.
+You: I want to finally ship my portfolio
+Momentum: Locked in: I want to finally ship my portfolio. What time should I nudge you every morning?
 
-You: priority finish the case study outline
-Momentum: Today’s priority is finish the case study outline. I’ll remember that when you text back later.
+You: 8am
+Momentum: Perfect. I’ll check in at 08:00. Do you want accountability that is gentle, strict, or tactical?
 
-You: stuck avoiding outreach because I do not know what to say
-Momentum: Start smaller than your brain wants. Draft one ugly message to one person and send it before you edit it into oblivion. Want me to help you write that first line?
+You: tactical
+Momentum: Set to tactical. Last onboarding step: what is today’s priority?
 
-You: nudge 8am
-Momentum: Daily nudge set for 08:00.
+You: finish the hero case study
+Momentum: You’re set. Today’s priority is finish the hero case study. I’ll keep the thread going from here.
+```
+
+### Ongoing Use
+
+```text
+You: stuck avoiding outreach
+Momentum: Quick truth: you have been circling this without a win. Send one ugly outreach message in the next 15 minutes, then text me "done sent one".
+
+You: done sent one
+Momentum: Count that as real progress. Keep the streak alive by naming the next action before the day ends.
 ```
 
 ## Commands
 
 - `goal ship my portfolio refresh`
 - `priority finish the case study outline`
+- `promise send two outreach messages`
 - `done sent the draft`
-- `stuck avoiding outreach because I do not know what to say`
+- `stuck avoiding outreach`
+- `reflect I overplanned and under-shipped`
 - `nudge 8am`
+- `mode planner`
+- `style strict`
+- `recap`
 - `status`
 - `help`
 
-Anything else is treated as a normal conversational message and routed through the coach with recent memory attached.
+Anything else is treated as conversation and passed through the coaching layer with memory and behavior signals attached.
 
-## Project Structure
+## Architecture
 
 ```text
 src/
-  index.ts               Photon watcher entrypoint
-  momentum-agent.ts      Command handling + coaching orchestration
-  coach.ts               OpenAI-backed and fallback coaching
-  parser.ts              Text command parsing
-  store/file-store.ts    Local JSON persistence
+  index.ts                 Runtime entrypoint + dry-run/healthcheck support
+  momentum-agent.ts        Onboarding, command routing, streaks, routines, duplicate protection
+  coach.ts                 OpenAI-backed coach with retry + fallback coach
+  logger.ts                Structured JSON logger
+  parser.ts                Text command parsing helpers
+  store/sqlite-store.ts    SQLite persistence for profiles, goals, journal, meta, processed GUIDs
 __tests__/
-  parser.test.ts
-  momentum-agent.test.ts
+  momentum-agent.test.ts   Onboarding, dedupe, weekly recap
+  parser.test.ts           Command/time parsing
+  sqlite-store.test.ts     Restart-safe persistence
 ```
 
 ## Setup
@@ -92,34 +115,48 @@ __tests__/
 npm install
 ```
 
-2. Give your terminal or IDE Full Disk Access on macOS so Photon can access the Messages database.
+2. Give your terminal or IDE Full Disk Access on macOS so Photon can read the Messages database.
 
-3. Create a local env file.
+3. Create your env file.
 
 ```bash
 cp .env.example .env
 ```
 
-4. Add your settings.
+4. Configure it.
 
 ```bash
-OPENAI_API_KEY=your_key_here
+OPENAI_API_KEY=your_rotated_key_here
 OPENAI_MODEL=gpt-4.1-mini
 AGENT_NAME=Momentum
+MOMENTUM_DB_FILE=./data/momentum.sqlite
+PROMPT_VERSION=2026-04-19-serious-v1
 ```
 
-5. Build and start the agent.
+## Run Modes
+
+Build first:
 
 ```bash
 npm run build
+```
+
+Live mode:
+
+```bash
 npm start
 ```
 
-## Development
+Dry-run mode:
 
 ```bash
-npm test
-npm run dev
+npm run dry-run
+```
+
+Health check:
+
+```bash
+npm run healthcheck
 ```
 
 ## Validation
@@ -129,6 +166,7 @@ npm run dev
 
 ## Notes
 
-- This project is intentionally text-first and has no companion UI.
-- Scheduler state is persisted alongside the rest of the local memory.
-- Without `OPENAI_API_KEY`, the agent still works using the fallback coach.
+- Without `OPENAI_API_KEY`, Momentum still works using the fallback coach.
+- Scheduler state is persisted in SQLite alongside user memory.
+- The app is intentionally text-first: no companion UI, no dashboard, no setup screen.
+- If an API key was pasted into chat or committed anywhere, rotate it before using the project.

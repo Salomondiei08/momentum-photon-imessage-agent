@@ -1,23 +1,20 @@
 import path from 'node:path';
 
-/**
- * Runtime configuration for the Momentum agent.
- */
 export interface AppConfig {
   model: string;
-  dataFile: string;
+  databaseFile: string;
   systemName: string;
+  promptVersion: string;
+  dryRun: boolean;
 }
 
-/**
- * Loads process-backed config with sensible local defaults.
- */
 export function loadConfig(): AppConfig {
   return {
     model: process.env.OPENAI_MODEL ?? 'gpt-4.1-mini',
-    dataFile:
-      process.env.MOMENTUM_DATA_FILE ??
-      path.join(process.cwd(), 'data', 'momentum-state.json'),
-    systemName: process.env.AGENT_NAME ?? 'Momentum'
+    databaseFile:
+      process.env.MOMENTUM_DB_FILE ?? path.join(process.cwd(), 'data', 'momentum.sqlite'),
+    systemName: process.env.AGENT_NAME ?? 'Momentum',
+    promptVersion: process.env.PROMPT_VERSION ?? '2026-04-19-serious-v1',
+    dryRun: process.env.DRY_RUN === '1' || process.argv.includes('--dry-run')
   };
 }

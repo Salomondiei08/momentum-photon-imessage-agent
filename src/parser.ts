@@ -1,9 +1,6 @@
-import type { ParsedCommand } from './types.js';
+import type { AccountabilityStyle, AgentMode, ParsedCommand } from './types.js';
 import { cleanText } from './utils.js';
 
-/**
- * Parses plain-text iMessage input into a narrow command set.
- */
 export function parseCommand(input: string): ParsedCommand {
   const text = input.trim();
   const lower = text.toLowerCase();
@@ -20,6 +17,10 @@ export function parseCommand(input: string): ParsedCommand {
     return { type: 'status' };
   }
 
+  if (lower === 'recap' || lower === 'weekly recap' || lower === 'review me') {
+    return { type: 'recap' };
+  }
+
   if (lower.startsWith('goal ')) {
     return { type: 'goal', value: cleanText(text.slice(5)) };
   }
@@ -28,12 +29,20 @@ export function parseCommand(input: string): ParsedCommand {
     return { type: 'priority', value: cleanText(text.slice(9)) };
   }
 
-  if (lower.startsWith('done ')) {
-    return { type: 'done', value: cleanText(text.slice(5)) };
+  if (lower.startsWith('promise ')) {
+    return { type: 'promise', value: cleanText(text.slice(8)) };
+  }
+
+  if (lower.startsWith('done')) {
+    return { type: 'done', value: cleanText(text.slice(4)) };
   }
 
   if (lower.startsWith('stuck ')) {
     return { type: 'stuck', value: cleanText(text.slice(6)) };
+  }
+
+  if (lower.startsWith('reflect ')) {
+    return { type: 'reflect', value: cleanText(text.slice(8)) };
   }
 
   const nudgeMatch = text.match(/^nudge\s+(.+)$/i);
@@ -41,12 +50,53 @@ export function parseCommand(input: string): ParsedCommand {
     return { type: 'nudge', time: cleanText(nudgeMatch[1]) };
   }
 
+  const modeMatch = text.match(/^mode\s+(.+)$/i);
+  if (modeMatch) {
+    const mode = parseMode(modeMatch[1]);
+    return mode ? { type: 'mode', mode } : { type: 'chat', value: text };
+  }
+
+  const styleMatch = text.match(/^style\s+(.+)$/i);
+  if (styleMatch) {
+    const style = parseStyle(styleMatch[1]);
+    return style ? { type: 'style', style } : { type: 'chat', value: text };
+  }
+
   return { type: 'chat', value: text };
 }
 
-/**
- * Parses a simple daily local time like `8am`, `08:30`, or `6:45 pm`.
- */
+export function parseMode(input: string): AgentMode | null {
+  const normalized = input.trim().toLowerCase();
+
+  if (normalized.includes('coach')) {
+    return 'coach';
+  }
+  if (normalized.includes('planner') || normalized.includes('plan')) {
+    return 'planner';
+  }
+  if (normalized.includes('review')) {
+    return 'review';
+  }
+
+  return null;
+}
+
+export function parseStyle(input: string): AccountabilityStyle | null {
+  const normalized = input.trim().toLowerCase();
+
+  if (normalized.includes('gentle')) {
+    return 'gentle';
+  }
+  if (normalized.includes('strict')) {
+    return 'strict';
+  }
+  if (normalized.includes('tactical')) {
+    return 'tactical';
+  }
+
+  return null;
+}
+
 export function parseDailyTime(input: string): { hour: number; minute: number; label: string } | null {
   const raw = input.trim().toLowerCase();
   const match = raw.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/);
@@ -81,9 +131,6 @@ export function parseDailyTime(input: string): { hour: number; minute: number; l
   };
 }
 
-/**
- * Computes the next occurrence of a daily time after `now`.
- */
 export function nextOccurrence(hour: number, minute: number, now: Date = new Date()): Date {
   const next = new Date(now);
   next.setSeconds(0, 0);
